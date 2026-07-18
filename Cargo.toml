@@ -1,6 +1,27 @@
 [package]
 name = "ai_breaker"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+
+
+
+
+
+[profile.release]
+opt-level = 3       # Maximum optimization for speed
+lto = true          # Link-Time Optimization to eliminate dead code across crates
+codegen-units = 1   # Reduces parallel generation blocks to allow deeper optimizations
+panic = "abort"     # Eliminates stack unwinding overhead for a smaller, faster binary
+strip = true
+
+
+
+
+
 
 [dependencies]
+genai = "0.6.5"
+redb = "4.1.0"
+clap = { version = "4.5", features = ["derive"] }
+colored = "2.1"
+tokio = { version = "1.0", features = ["full"] } # Added for smooth async timing
