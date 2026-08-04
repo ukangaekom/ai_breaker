@@ -1,8 +1,8 @@
-use genai::chat::{ChatMessage, ChatRequest};
+use genai::chat::{ChatMessage as GenAiMessage, ChatRequest};
 use genai::Client;
 use std::sync::{Arc, OnceLock};
+use crate::database::ChatMessage;
 
-// static PROCESS_SYSTEM_CONFIGURATION: OnceCell<String> = OnceCell::const_new();
 static CLIENT: OnceLock<Arc<Client>> = OnceLock::new();
 
 #[inline(always)]
@@ -10,22 +10,34 @@ pub fn get_client() -> Arc<Client> {
     CLIENT.get_or_init(|| Arc::new(Client::default())).clone()
 }
 
-async fn model_chat(
+pub async fn exec_model_chat(
     model_name: &str,
-    system_instruction: &str,
+    system_instruction: Option<&str>,
+    history: &[ChatMessage],
     prompt: &str,
-) -> Option<std::string::String> {
+) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     let client = get_client();
-    let chat_req: ChatRequest = ChatRequest::new(vec![
-        ChatMessage::system(system_instruction),
-        ChatMessage::user(prompt),
-    ]);
+    let mut messages = Vec::new();
 
-    let model: &str = model_name;
+    if let Some(sys) = system_instruction {
+        if !sys.trim().is_empty() {
+            messages.push(GenAiMessage::system(sys));
+        }
+    }
 
-    let chat_res = client.exec_chat(model, chat_req, None).await;
+    for msg in history {
+        match msg.role.to_lowercase().as_str() {
+            "system" => messages.push(GenAiMessage::system(&msg.content)),
+            "assistant" | "model" => messages.push(GenAiMessage::assistant(&msg.content)),
+            _ => messages.push(GenAiMessage::user(&msg.content)),
+        }
+    }
 
-    println!("{:?}", &chat_res);
+    messages.push(GenAiMessage::user(prompt));
 
-    chat_res.expect("REASON").into_first_text()
+    let chat_req = ChatRequest::new(messages);
+    let chat_res = client.exec_chat(model_name, chat_req, None).await?;
+    
+    let text = chat_res.into_first_text().unwrap_or_else(|| "No text response".into());
+    Ok(text)
 }

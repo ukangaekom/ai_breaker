@@ -1,9 +1,9 @@
 # ai_breaker
 
 
-## AI Breaker: CLI Installable Multi-Agent Pipeline Engine
+## AI Breaker: Embedded LLM Security Evaluation Framework
 
-AI Breaker is a CLI-first engine for unified testing and evaluation of large language models. It ships as a command-line tool you can install and run locally, so every model test is fast, repeatable, and terminal-native.
+A Rust-based, embedded LLM security evaluation framework that interacts with multiple AI models, allows configurable system prompts, performs prompt-injection/jailbreak experiments, records complete conversations and metadata (ULID, timestamps, latency, tokens, model version, etc.) in redb, and is intended to produce reproducible evidence for AI security research.
 
 ### Why it’s powerful
 
