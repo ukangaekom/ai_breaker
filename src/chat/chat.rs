@@ -2,7 +2,7 @@ use colored::*;
 use std::io::{self, Write};
 use std::time::Instant;
 use crate::database::{ChatMessage, ChatLog, DatabaseManager, ModelInfo};
-use crate::model::exec_model_chat;
+use crate::model::{exec_model_chat, reset_client, resolve_api_key_env_var};
 
 pub async fn start() {
     println!("\n{}", "=== AI Breaker Interactive Session Setup ===".cyan().bold());
@@ -31,6 +31,42 @@ pub async fn start() {
         model_name
     };
 
+    // 2. Prompt for Provider API Key (Hidden Input)
+    let env_var_name = resolve_api_key_env_var(model_name);
+    let existing_key = std::env::var(env_var_name).ok();
+
+    let key_prompt = if let Some(ref key) = existing_key {
+        let masked = if key.len() > 8 {
+            format!("{}...{}", &key[..4], &key[key.len() - 4..])
+        } else {
+            "****".to_string()
+        };
+        format!(
+            "{} {} ({}) - Press Enter to keep or paste new hidden API key: ",
+            "Detected".green(),
+            env_var_name.bold(),
+            masked.yellow()
+        )
+    } else {
+        format!(
+            "Enter hidden API Key for {} (input hidden; press Enter if local model): ",
+            env_var_name.bold()
+        )
+    };
+
+    let key_input = rpassword::prompt_password(key_prompt).unwrap_or_default();
+    let trimmed_key = key_input.trim();
+
+    if !trimmed_key.is_empty() {
+        std::env::set_var(env_var_name, trimmed_key);
+        reset_client();
+        println!("{} Configured {} for active session (key hidden).", "[API Key]".green().bold(), env_var_name.cyan());
+    } else if existing_key.is_some() {
+        println!("{} Retained existing {}.", "[API Key]".green().bold(), env_var_name.cyan());
+    } else {
+        println!("{} No key entered. Proceeding with environment defaults for {}.", "[API Key]".yellow().bold(), env_var_name);
+    }
+
     // Register model info in DB if DB is active
     if let Some(ref db_mgr) = db {
         let provider = model_name
@@ -54,7 +90,7 @@ pub async fn start() {
         }
     }
 
-    // 2. Set System Prompt / Instructions
+    // 3. Set System Prompt / Instructions
     print!("{} ", "Enter temporary System Prompt/Instruction (leave empty for none):".yellow().bold());
     io::stdout().flush().unwrap();
     let mut sys_input = String::new();
@@ -68,6 +104,7 @@ pub async fn start() {
 
     println!("\n{}", "------------------------------------------------------------".bright_black());
     println!("{} {}", "Model Target:".bold(), model_name.green());
+    println!("{} {}", "API Key Env:".bold(), env_var_name.cyan());
     if let Some(ref sys) = system_instruction {
         println!("{} {}", "System Instruction:".bold(), sys.magenta());
     } else {
